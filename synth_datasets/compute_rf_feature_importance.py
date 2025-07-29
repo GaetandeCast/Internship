@@ -86,15 +86,12 @@ def compute_rf_feature_importance(rf, X, y, loss, methods, X_test=None, y_test=N
                 elif loss in ["mse", "squared_error"]:
                     if "j-score" in methods:
                         impurity["j-score"][node_idx] = (
-                            np.mean(y_innode_oob**2)
-                            - 2 * y_innode_oob.mean() * y_innode_inb.mean()
-                            + y_innode_inb.mean() ** 2
+                            np.mean((y_innode_oob - y_innode_inb.mean()) ** 2)
                         )
                     if "UFI" in methods:
                         impurity["UFI"][node_idx] = (
-                            np.mean(y_innode_oob**2)
-                            - 2 * y_innode_oob.mean() * y_innode_inb.mean()
-                            + np.mean(y_innode_inb**2)
+                            np.mean((y_innode_oob - y_innode_inb.mean()) ** 2)
+                            + np.mean((y_innode_inb - y_innode_inb.mean()) ** 2)
                         ) / 2
                     if "MDI-oob" in methods:
                         impurity["MDI-oob"][node_idx] = (
