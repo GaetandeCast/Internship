@@ -5,7 +5,7 @@ from sklearn.ensemble._forest import (
 )
 
 
-def compute_rf_feature_importance(rf, X, y, loss, methods):
+def compute_rf_feature_importance(rf, X, y, loss, methods, X_test=None, y_test=None):
     """
     Compute the j-score, UFI or MDI-oob feature importance of a given random forest.
     """
@@ -34,9 +34,24 @@ def compute_rf_feature_importance(rf, X, y, loss, methods):
         impurity = {method: np.zeros(n_nodes) for method in methods}
         has_oob_samples_in_children = [True] * n_nodes
 
+        if X_test is not None and y_test is not None and "j-score_test" in methods:
+            decision_path_test = np.array(tree.decision_path(X_test).todense())
+            omega_test = np.sum(decision_path_test, axis=0) / X_test.shape[0]
+
+            impurity = {method: np.zeros(n_nodes) for method in methods}
+            has_test_samples_in_children = [True] * n_nodes
+
+            do_test = True
+        else:
+            do_test = False
+
         for node_idx in range(n_nodes):  # Compute the "cross-impurity" of each node
             y_innode_oob = y_oob[np.where(decision_path_oob[:, node_idx].ravel())]
             y_innode_inb = y_inb[np.where(decision_path_inb[:, node_idx].ravel())]
+            if do_test:
+                y_innode_test = y_test[
+                    np.where(decision_path_test[:, node_idx].ravel())
+                ]
 
             if len(y_innode_oob) == 0:  # If no oob in node, skip and flag the node
                 if sum(tree.tree_.children_left == node_idx) > 0:
@@ -49,10 +64,7 @@ def compute_rf_feature_importance(rf, X, y, loss, methods):
                         tree.tree_.children_right == node_idx
                     ][0]
                     has_oob_samples_in_children[parent_node] = False
-
             else:
-                if len(y_innode_inb) == 0:
-                    print(X.shape[0])
                 if loss in ["gini", "brier"]:
                     p_node_oob = np.unique(y_innode_oob, return_counts=True)[1] / len(
                         y_innode_oob
@@ -88,6 +100,39 @@ def compute_rf_feature_importance(rf, X, y, loss, methods):
                         impurity["MDI-oob"][node_idx] = (
                             -y_innode_oob.mean() * y_innode_inb.mean()
                         )
+                if do_test:
+                    if (
+                        len(y_innode_test) == 0
+                    ):  # If no test in node, skip and flag the node
+                        if sum(tree.tree_.children_left == node_idx) > 0:
+                            parent_node = np.arange(n_nodes)[
+                                tree.tree_.children_left == node_idx
+                            ][0]
+                            has_test_samples_in_children[parent_node] = False
+                        else:
+                            parent_node = np.arange(n_nodes)[
+                                tree.tree_.children_right == node_idx
+                            ][0]
+                            has_test_samples_in_children[parent_node] = False
+                    else:
+                        if loss in ["gini", "brier"]:
+                            p_node_test = np.unique(y_innode_test, return_counts=True)[
+                                1
+                            ] / len(y_innode_test)
+                            p_node_inb = np.unique(y_innode_inb, return_counts=True)[
+                                1
+                            ] / len(y_innode_inb)
+                            impurity["j-score_test"][node_idx] = np.sum(
+                                p_node_test
+                                - 2 * p_node_test * p_node_inb
+                                + p_node_inb**2
+                            )
+                        elif loss in ["mse", "squared_error"]:
+                            impurity["j-score_test"][node_idx] = (
+                                np.mean(y_innode_test**2)
+                                - 2 * y_innode_test.mean() * y_innode_inb.mean()
+                                + y_innode_inb.mean() ** 2
+                            )
         for node_idx in range(n_nodes):
             if (
                 tree.tree_.children_left[node_idx] == -1
@@ -119,6 +164,12 @@ def compute_rf_feature_importance(rf, X, y, loss, methods):
                         - omega_inb[node_left] * impurity["UFI"][node_left]
                         - omega_inb[node_right] * impurity["UFI"][node_right]
                     )
+            if do_test and has_test_samples_in_children[node_idx]:
+                fi_tree["j-score_test"][feature_idx] += (
+                    omega_test[node_idx] * impurity["j-score_test"][node_idx]
+                    - omega_test[node_left] * impurity["j-score_test"][node_left]
+                    - omega_test[node_right] * impurity["j-score_test"][node_right]
+                )
         for method in methods:
             feature_importance[method] += fi_tree[method]
     for method in methods:
