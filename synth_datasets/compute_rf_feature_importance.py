@@ -126,9 +126,7 @@ def compute_rf_feature_importance(rf, X, y, loss, methods, X_test=None, y_test=N
                             )
                         elif loss in ["mse", "squared_error"]:
                             impurity["j-score_test"][node_idx] = (
-                                np.mean(y_innode_test**2)
-                                - 2 * y_innode_test.mean() * y_innode_inb.mean()
-                                + y_innode_inb.mean() ** 2
+                                np.mean((y_innode_test - y_innode_inb.mean()) ** 2)
                             )
         for node_idx in range(n_nodes):
             if (
