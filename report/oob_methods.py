@@ -5,7 +5,7 @@ from sklearn.ensemble._forest import (
 )
 
 
-def compute_oob_fis(rf, X, y, loss, methods):
+def compute_oob_fis(rf, X, y, loss, methods, is_classif=False):
     """
     Compute the j-score, UFI, MDI-oob, or naive-oob feature importance of a given random forest.
     """
@@ -35,7 +35,8 @@ def compute_oob_fis(rf, X, y, loss, methods):
         cross_impurity = np.zeros(n_nodes)
         oob_impurity = np.zeros(n_nodes)
         has_oob_samples_in_children = [True] * n_nodes
-
+        if is_classif:
+            n_classes = len(np.unique(y))
 
         for node_idx in range(n_nodes):  # Compute the "cross-impurity" of each node
             y_innode_oob = y_oob[np.where(decision_path_oob[:, node_idx].ravel())]
@@ -53,11 +54,50 @@ def compute_oob_fis(rf, X, y, loss, methods):
                     ][0]
                     has_oob_samples_in_children[parent_node] = False
             else:
-                if "UFI" in methods or "MDI-oob" in methods:
-                    impurity[node_idx] = loss(y_innode_inb, np.repeat(y_innode_inb.mean(), len(y_innode_inb)))
-                if "naive-oob" in methods:
-                    oob_impurity[node_idx] = loss(y_innode_oob, np.repeat(y_innode_oob.mean(), len(y_innode_oob)))
-                cross_impurity[node_idx] = loss(y_innode_oob, np.repeat(y_innode_inb.mean(), len(y_innode_oob)))
+                if is_classif:
+                    if "UFI" in methods or "MDI-oob" in methods:
+                        impurity[node_idx] = loss(
+                            y_innode_inb,
+                            np.tile(
+                                np.bincount(y_innode_inb, minlength=n_classes)
+                                / len(y_innode_inb),
+                                (len(y_innode_inb), 1),
+                            ),
+                            labels=np.arange(n_classes),
+                        )
+                    if "naive-oob" in methods:
+                        oob_impurity[node_idx] = loss(
+                            y_innode_oob,
+                            np.tile(
+                                np.bincount(y_innode_oob, minlength=n_classes)
+                                / len(y_innode_oob),
+                                (len(y_innode_oob), 1),
+                            ),
+                            labels=np.arange(n_classes),
+                        )
+                    cross_impurity[node_idx] = loss(
+                        y_innode_oob,
+                        np.tile(
+                            np.bincount(y_innode_inb, minlength=n_classes)
+                            / len(y_innode_inb),
+                            (len(y_innode_oob), 1),
+                        ),
+                        labels=np.arange(n_classes),
+                    )
+                else:
+                    if "UFI" in methods or "MDI-oob" in methods:
+                        impurity[node_idx] = loss(
+                            y_innode_inb,
+                            np.repeat(y_innode_inb.mean(), len(y_innode_inb)),
+                        )
+                    if "naive-oob" in methods:
+                        oob_impurity[node_idx] = loss(
+                            y_innode_oob,
+                            np.repeat(y_innode_oob.mean(), len(y_innode_oob)),
+                        )
+                    cross_impurity[node_idx] = loss(
+                        y_innode_oob, np.repeat(y_innode_inb.mean(), len(y_innode_oob))
+                    )
 
         for node_idx in range(n_nodes):
             if (
@@ -80,16 +120,28 @@ def compute_oob_fis(rf, X, y, loss, methods):
                     )
                 if "MDI-oob" in methods:
                     fi_tree["MDI-oob"][feature_idx] += (
-                        omega_oob[node_idx] * (impurity[node_idx] + cross_impurity[node_idx]) / 2
-                        - omega_oob[node_left] * (impurity[node_left] + cross_impurity[node_left]) / 2
-                        - omega_oob[node_right] * (impurity[node_right] + cross_impurity[node_right]) / 2
+                        omega_oob[node_idx]
+                        * (impurity[node_idx] + cross_impurity[node_idx])
+                        / 2
+                        - omega_oob[node_left]
+                        * (impurity[node_left] + cross_impurity[node_left])
+                        / 2
+                        - omega_oob[node_right]
+                        * (impurity[node_right] + cross_impurity[node_right])
+                        / 2
                     )
                 if "UFI" in methods:
                     fi_tree["UFI"][feature_idx] += (
-                        omega_inb[node_idx] * (impurity[node_idx] + cross_impurity[node_idx]) / 2
-                        - omega_inb[node_left] * (impurity[node_left] + cross_impurity[node_left]) / 2
-                        - omega_inb[node_right] * (impurity[node_right] + cross_impurity[node_right]) / 2
-                    )                
+                        omega_inb[node_idx]
+                        * (impurity[node_idx] + cross_impurity[node_idx])
+                        / 2
+                        - omega_inb[node_left]
+                        * (impurity[node_left] + cross_impurity[node_left])
+                        / 2
+                        - omega_inb[node_right]
+                        * (impurity[node_right] + cross_impurity[node_right])
+                        / 2
+                    )
                 if "naive-oob" in methods:
                     fi_tree["naive-oob"][feature_idx] += (
                         omega_inb[node_idx] * oob_impurity[node_idx]

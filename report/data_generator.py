@@ -81,3 +81,35 @@ def generate_gaussian_causal_network(
      
     X = rng.multivariate_normal(mu, Sigma, n_sample)
     return X, mu, Sigma
+
+def generate_noised_led_sample(
+    n_sample=200, irrelevant=None, flip_proba=0.1, random_state=None
+):
+    random_state = check_random_state(random_state)
+
+    data = np.array(
+        [
+            [0, 0, 1, 0, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 0, 1, 2],
+            [1, 0, 1, 1, 0, 1, 1, 3],
+            [0, 1, 1, 1, 0, 1, 0, 4],
+            [1, 1, 0, 1, 0, 1, 1, 5],
+            [1, 1, 0, 1, 1, 1, 1, 6],
+            [1, 0, 1, 0, 0, 1, 0, 7],
+            [1, 1, 1, 1, 1, 1, 1, 8],
+            [1, 1, 1, 1, 0, 1, 1, 9],
+            [1, 1, 1, 0, 1, 1, 1, 0],
+        ]
+    )
+
+    data = data[random_state.randint(0, 10, n_sample)]
+    X, y = np.array(data[:, :7], dtype=np.intp), data[:, 7]
+    X_noised = np.zeros_like(X)
+    for sample in range(n_sample):
+        X_noised[sample, :] = np.abs(
+            random_state.binomial(n=1, p=flip_proba, size=7) - X[sample, :]
+        )
+    if irrelevant:
+        for proba in irrelevant:
+            X_noised = np.hstack((X_noised, random_state.binomial(n=1, p=proba, size=n_sample)[:, np.newaxis]))
+    return X_noised, y
