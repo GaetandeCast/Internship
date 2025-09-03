@@ -112,97 +112,6 @@ def prepare_boxplot_data(methods_dict, n_simulations):
     
     return pd.DataFrame(data_rows)
 
-def create_feature_importance_boxplots(methods_dict, n_simulations, figsize=(10, 20)):
-    """
-    Create comprehensive boxplot visualization.
-    
-    Parameters:
-    -----------
-    methods_dict : dict
-        Dictionary of method names and their results
-    n_simulations : int
-        Number of simulations
-    figsize : tuple
-        Figure size (width, height)
-    
-    Returns:
-    --------
-    matplotlib.figure.Figure : The created figure
-    """
-    # Prepare data
-    df = prepare_boxplot_data(methods_dict, n_simulations)
-    
-    # Set up the plotting style
-    plt.style.use('default')
-    sns.set_palette("husl")
-    
-    # Create figure with subplots for each method
-    n_methods = len(methods_dict)
-    fig, axes = plt.subplots(n_methods, 1, figsize=figsize, sharex=True)
-    
-    # Handle case with single method
-    if n_methods == 1:
-        axes = [axes]
-    
-    # Define colors for Markov blanket vs non-Markov blanket features
-    markov_features = [1, 2, 4, 7]
-    feature_colors = {}
-    for feature in [0, 1, 2, 3, 4, 6, 7, 8]:
-        if feature in markov_features:
-            feature_colors[f'Feature {feature}'] = 'lightcoral'  # Red for Markov blanket
-        else:
-            feature_colors[f'Feature {feature}'] = 'lightblue'   # Blue for non-Markov blanket
-    
-    # Create boxplot for each method
-    for i, method_name in enumerate(methods_dict.keys()):
-        method_data = df[df['Method'] == method_name]
-        
-        # Create boxplot
-        box_plot = axes[i].boxplot(
-            [method_data[method_data['Original_Feature_Index'] == feat]['Importance'].values 
-             for feat in [0, 1, 2, 3, 4, 6, 7, 8]],
-            tick_labels=[f'F{feat}' for feat in [0, 1, 2, 3, 4, 6, 7, 8]],
-            patch_artist=True,
-            notch=True,
-            showmeans=True,
-            meanline=True
-        )
-        
-        # Color the boxes
-        for patch, feature in zip(box_plot['boxes'], [0, 1, 2, 3, 4, 6, 7, 8]):
-            color = 'lightcoral' if feature in markov_features else 'lightblue'
-            patch.set_facecolor(color)
-            patch.set_alpha(0.7)
-        
-        # Customize the subplot
-        axes[i].set_title(f'{method_name} - Feature Importance Distribution', 
-                         fontsize=12, fontweight='bold')
-        axes[i].set_ylabel('Importance Score', fontsize=10)
-        axes[i].grid(True, alpha=0.3, axis='y')
-        
-        # Add horizontal line at zero
-        axes[i].axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
-        
-        # Rotate x-axis labels if needed
-        axes[i].tick_params(axis='x', rotation=0)
-    
-    # Set common x-label
-    axes[-1].set_xlabel('Features (F5 is target, excluded)', fontsize=12, fontweight='bold')
-    
-    # Add legend
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor='lightcoral', alpha=0.7, label='Markov Blanket (1,2,4,7)'),
-        Patch(facecolor='lightblue', alpha=0.7, label='Non-Markov Blanket (0,3,6)')
-    ]
-    fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98))
-    
-    # Adjust layout
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.95)  # Make room for legend
-    
-    return fig
-
 def create_comparative_boxplot(methods_dict, n_simulations, figsize=(20, 10)):
     """
     Create a single plot comparing all methods side by side.
@@ -260,35 +169,6 @@ def create_comparative_boxplot(methods_dict, n_simulations, figsize=(20, 10)):
     
     return fig
 
-def print_summary_statistics(methods_dict, n_simulations):
-    """
-    Print summary statistics for each method and feature.
-    """
-    df = prepare_boxplot_data(methods_dict, n_simulations)
-    
-    print("SUMMARY STATISTICS")
-    print("=" * 80)
-    print("Mean importance scores by method and feature:")
-    print("-" * 50)
-    
-    # Calculate means for each method-feature combination
-    summary = df.groupby(['Method', 'Original_Feature_Index'])['Importance'].agg([
-        'mean', 'std', 'median', 'min', 'max'
-    ]).round(4)
-    
-    for method in methods_dict.keys():
-        print(f"\n{method}:")
-        method_summary = summary.loc[method]
-        
-        print("  Feature | Mean     | Std      | Median   | Min      | Max      | MB?")
-        print("  --------|----------|----------|----------|----------|----------|----")
-        
-        for feature in [0, 1, 2, 3, 4, 6, 7, 8]:
-            if feature in method_summary.index:
-                stats = method_summary.loc[feature]
-                is_mb = "Yes" if feature in [1, 2, 4, 7] else "No"
-                print(f"  {feature:7d} | {stats['mean']:8.4f} | {stats['std']:8.4f} | "
-                      f"{stats['median']:8.4f} | {stats['min']:8.4f} | {stats['max']:8.4f} | {is_mb:3s}")
 
 def test_zero_importance(importance_scores, feature_idx=8, alpha=0.05):
     """
@@ -404,7 +284,7 @@ def analyze_random_feature_importance(methods_dict, random_feature_idx=8, alpha=
     print("=" * 70)
     print(f"H0: Feature {random_feature_idx} has zero importance (mean = 0)")
     print(f"H1: Feature {random_feature_idx} has non-zero importance (mean ≠ 0)")
-    print(f"Significance level: α = {alpha}")
+    print(f"Significance level: $\\alpha$ = {alpha}")
     print()
     
     for method_name, results_dict in methods_dict.items():
@@ -418,8 +298,10 @@ def analyze_random_feature_importance(methods_dict, random_feature_idx=8, alpha=
         # Display results
         print(f"{method_name:12} | n={test_result['n_samples']:2d} | "
               f"mean={test_result['mean']:8.4f} | std={test_result['std']:8.4f} | "
-              f"t={test_result['t_statistic']:7.3f} | p={test_result['p_value']:7.4f} | "
-              f"Zero: {'YES' if test_result['is_zero_ttest'] else 'NO':3s}")
+              f"t stat={test_result['t_statistic']:7.3f} | t-test pval={test_result['p_value']:7.4f} | "
+              f"Zero t-test: {'YES' if test_result['is_zero_ttest'] else 'NO':3s} | "
+              f"Wilcoxon stat={test_result['wilcoxon_statistic']:7.3f} | Wilcoxon pval={test_result['wilcoxon_p_value']:7.4f} | "
+              f"Zero Wilcoxon: {'YES' if test_result['is_zero_wilcoxon'] else 'NO':3s}")
     
     print("\n" + "=" * 70)
     
@@ -427,13 +309,13 @@ def analyze_random_feature_importance(methods_dict, random_feature_idx=8, alpha=
     zero_methods_ttest = [name for name, res in results.items() if res['is_zero_ttest']]
     zero_methods_wilcoxon = [name for name, res in results.items() if res['is_zero_wilcoxon']]
     
-    print(f"Methods that assign ZERO importance (t-test, α={alpha}):")
+    print(f"Methods that assign ZERO importance (t-test, $\\alpha$={alpha}):")
     if zero_methods_ttest:
         print(f"  {', '.join(zero_methods_ttest)}")
     else:
         print("  None")
     
-    print(f"\nMethods that assign ZERO importance (Wilcoxon test, α={alpha}):")
+    print(f"\nMethods that assign ZERO importance (Wilcoxon test, $\\alpha$={alpha}):")
     if zero_methods_wilcoxon:
         print(f"  {', '.join(zero_methods_wilcoxon)}")
     else:
@@ -445,32 +327,40 @@ def plot_random_feature_distributions(methods_dict, random_feature_idx=8):
     """
     Plot distributions of importance scores for the random feature.
     """
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
     axes = axes.flatten()
-    
+    min_plot = 0
+    max_plot = 0
+
     for i, (method_name, results_dict) in enumerate(methods_dict.items()):
         if i >= len(axes):
             break
             
         scores = extract_random_feature_importance(results_dict, random_feature_idx)
         
+        # Udate the minimum and maximum values
+        min_plot = min(min(scores), min_plot)
+        max_plot = max(max(scores), max_plot)
+
         # Histogram
         axes[i].hist(scores, bins=20, alpha=0.7, edgecolor='black')
         axes[i].axvline(0, color='red', linestyle='--', label='Zero importance')
         axes[i].axvline(np.mean(scores), color='green', linestyle='-', 
                        label=f'Mean = {np.mean(scores):.4f}')
-        axes[i].set_title(f'{method_name}\nRandom Feature {random_feature_idx}')
+        axes[i].set_title(f'{method_name}')
         axes[i].set_xlabel('Importance Score')
         axes[i].set_ylabel('Frequency')
         axes[i].legend()
         axes[i].grid(True, alpha=0.3)
     
+    for i in range(len(methods_dict)):
+        axes[i].set_xlim(min_plot, max_plot)
+
     # Hide unused subplots
     for i in range(len(methods_dict), len(axes)):
         axes[i].set_visible(False)
     
     plt.tight_layout()
-    plt.show()
     
     return fig
 

@@ -7,7 +7,7 @@ from sklearn.ensemble._forest import (
 
 def compute_oob_fis(rf, X, y, loss, methods, is_classif=False):
     """
-    Compute the j-score, UFI, MDI-oob, or naive-oob feature importance of a given random forest.
+    Compute the oob-score, UFI, MDI-oob, or naive-oob feature importance of a given random forest.
     """
 
     feature_importance = {method: np.zeros(X.shape[1]) for method in methods}
@@ -112,8 +112,8 @@ def compute_oob_fis(rf, X, y, loss, methods, is_classif=False):
             node_right = tree.tree_.children_right[node_idx]
 
             if has_oob_samples_in_children[node_idx]:
-                if "j-score" in methods:
-                    fi_tree["j-score"][feature_idx] += (
+                if "oob-score" in methods:
+                    fi_tree["oob-score"][feature_idx] += (
                         omega_oob[node_idx] * cross_impurity[node_idx]
                         - omega_oob[node_left] * cross_impurity[node_left]
                         - omega_oob[node_right] * cross_impurity[node_right]
