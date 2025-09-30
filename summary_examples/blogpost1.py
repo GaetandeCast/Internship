@@ -146,13 +146,13 @@ print(f"Test R^2: {rf_regressor.score(X_test, y_test):.3f}")
 # %% [markdown]
 # Let us now use `permutation_importance` to inspect our model and see how it can be improved.
 # We compute the permutation importance on both the train and the test set and see that
-# they give very different results: every features has non-zero importance on the train set,
+# they give very different results: every feature has non-zero importance on the train set,
 # while only a small subset of features seem to have significantly non-zero importance on the
 # test set.
 #
 # Warning: at this point, we can not conclude that e.g. only features of index 0, 1 and 2 are
 # relevant for our problem, even if they are the ones that receive significant importance on the
-# test set. We need to have a model that generalizes well before making such conclusion.
+# test set. We need to have a model that generalizes well before making such conclusions.
 n_features = X.shape[1]
 feature_names = [f"{i}" for i in range(n_features)]
 
@@ -232,7 +232,7 @@ rfecv = RFECV(
 )
 rfecv.fit(X, y)
 # %% [markdown]
-# We see now that once we trim the irrelevant features, our model performs much better on
+# We see that once we trim the irrelevant features, our model performs much better on
 # test data, with an $R^2$ score close to 1. This score does not drop significantly when
 # we re-train on only half the data, indicating that the model is close to Bayes-optimal.
 # This is also shown in the fact that permutation importance measures are very similar
@@ -240,7 +240,7 @@ rfecv.fit(X, y)
 #
 # Looking at the features that were kept by `RFECV` and their permutation importance,
 # we can see that features 0, 1 and 2 seem to be equally important for the underlying process.
-# Interestingly we see that feature 3 was also kept, while having relatively less
+# Interestingly, we see that feature 3 was also kept, while having relatively less
 # importance. It was not obvious at first that this feature would be relevant for the
 # underlying process, but we can now assert it as our model performs well.
 
