@@ -18,8 +18,8 @@
 # We construct a synthetic problem for which a linear model is not able to predict better than
 # the empty model, i.e., the model predicting the observed average of the target.
 #
-# As we can see, the model assigns a zero coefficient to the feature of index 1, indicating that it can learn
-# nothing from it. We might want to conclude that this feature holds no information on the target.
+# As we can see, the model assigns a zero coefficient to features 1 and 2, indicating that it can learn
+# nothing from them. We might want to conclude that these features hold no information on the target.
 # However, since the performance of our model is really bad on external data, we should not draw any conclusion
 # on the underlying process and focus on improving the model first.
 
@@ -35,7 +35,7 @@ sigma = 0.5
 X = rng.choice(np.arange(-1, 2), 3 * n_samples).reshape((n_samples, 3))
 y = X[:, 0] + (X[:, 0] + X[:, 1]) ** 2 + rng.normal(0, sigma**2, n_samples)
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=rng
+    X, y, test_size=0.5, random_state=rng
 )
 
 linear_regressor = LassoCV(random_state=rng)
@@ -56,17 +56,16 @@ print(f"Test R^2 score of the model: {linear_regressor.score(X_test, y_test):.3f
 # To try and improve the model, we let it consider non linear interactions between the features by
 # passing them through a `PolynomialFeatures` transformer.
 #
-# We now see that $X_0$, $X_0^2$, $X_1^2$ and $X_0 X_1$ receive non zero coefficients.
+# We now see that $X_0$, $X_0^2$, $X_1^2$ and $X_0 X_1$ receive significantly non zero coefficients.
 # Since the $R^2$ score of the model on test data is close to one and does not drop when we train on
 # half the data, we know that the model is well specified. Therefore we can draw conclusions on the
 # importance of the features for the underlying process.
 #
 # Discarding $X_1$ at the previous step would have been a mistake: it is used by the properly specified
-# model. It was ignored by the previous model as its impact is only through its square and an
-# interaction term. We can now say that it is important for the underlying process. $X_2$
-# on the contrary, despite receiving a non zero coefficient with the first model, is not used by the
-# proper model: it was probably used to overfit initially but was discarded when more actually informative
-# features arose.
+# model. It was ignored by the simpler model as its impact on the target is only through its square and its
+# interaction with $X_0$. We can now say that $X_1$ is important for the underlying process. Some features involving 
+# $X_2$ are receiving low but non zero coefficients in the second model. It is not clear from just these coefficients
+# if $X_2$ has a low impact on the target or if the model is overfitting on it.
 
 
 # %%
@@ -75,23 +74,16 @@ from sklearn.preprocessing import PolynomialFeatures
 PF = PolynomialFeatures(degree=2)
 X_poly = PF.fit_transform(X)
 feature_names = PF.get_feature_names_out()
-X_poly_train, X_poly_test = train_test_split(X_poly, test_size=0.2, random_state=rng)
-
+X_poly_train, X_poly_test, y_train, y_test = train_test_split(
+    X_poly, y, test_size=0.5, random_state=rng
+)
 linear_regressor.fit(X_poly_train, y_train)
 print("Features with non zero coef:")
 print(
     [
-        f"{feature_names[idx]}, coef: {linear_regressor.coef_[idx]:.2f}"
-        for idx in range(len(feature_names))
-        if linear_regressor.coef_[idx] > 0.01
-    ]
-)
-print("Features with zero coef:")
-print(
-    [
-        f"{feature_names[idx]}"
-        for idx in range(len(feature_names))
-        if linear_regressor.coef_[idx] < 0.01
+        f"{feature_names[idx]}, coef: {linear_regressor.coef_[idx]:.3f}"
+        for idx in np.argsort(linear_regressor.coef_)[::-1]
+        if linear_regressor.coef_[idx] != 0
     ]
 )
 print(f"Test R^2 score of the model: {linear_regressor.score(X_poly_test, y_test):.3f}")
@@ -131,7 +123,7 @@ X = np.hstack(
 )
 y = (X[:, 0] + X[:, 1] + X[:, 2]) ** 2 + X[:, 3] + rng.normal(0, sigma**2, n_samples)
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=rng
+    X, y, test_size=0.5, random_state=rng
 )
 
 
@@ -216,7 +208,7 @@ def permutation_importance_getter(model, feature_indices, X_val, y_val, random_s
         model,
         X_val[:, feature_indices],
         y_val,
-        n_jobs=2,
+        n_jobs=-1,
         random_state=random_state,
     ).importances_mean
 
