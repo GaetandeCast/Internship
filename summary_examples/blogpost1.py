@@ -18,7 +18,7 @@
 # We construct a synthetic problem for which a linear model is not able to predict better than
 # the empty model, i.e., the model predicting the observed average of the target.
 #
-# As we can see, the model assigns a zero coefficient to features 1 and 2, indicating that it can learn
+# As we can see, the model assigns a zero coefficient to features $X_1$ and $X_2$, indicating that it can learn
 # nothing from them. We might want to conclude that these features hold no information on the target.
 # However, since the performance of our model is really bad on external data, we should not draw any conclusion
 # on the underlying process and focus on improving the model first.
@@ -40,10 +40,11 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 linear_regressor = LassoCV(random_state=rng)
 linear_regressor.fit(X_train, y_train)
+# maybe a dataframe feature | coef will be better looking ?
 print("Features with non zero coef:")
 print(
     [
-        f"Feature {idx}, coef: {linear_regressor.coef_[idx]:.2f}"
+        f"x{idx} coef={linear_regressor.coef_[idx]:.2f}"
         for idx in range(3)
         if linear_regressor.coef_[idx] != 0
     ]
@@ -63,9 +64,10 @@ print(f"Test R^2 score of the model: {linear_regressor.score(X_test, y_test):.3f
 #
 # Discarding $X_1$ at the previous step would have been a mistake: it is used by the properly specified
 # model. It was ignored by the simpler model as its impact on the target is only through its square and its
-# interaction with $X_0$. We can now say that $X_1$ is important for the underlying process. Some features involving 
-# $X_2$ are receiving low but non zero coefficients in the second model. It is not clear from just these coefficients
-# if $X_2$ has a low impact on the target or if the model is overfitting on it.
+# interaction with $X_0$. We can now say that $X_1$ is important for the underlying process. Some features involving
+# $X_2$ are receiving low but non zero coefficients in the second model. In our synthetic case, we know
+# that the target $Y = X_0 + (X_0+X_1)^2 + \text{noise}$ does not depend on $X_2$, so these small nonzero coefficients
+# are only finite sample errors.
 
 
 # %%
@@ -161,14 +163,14 @@ ax1.set_yticklabels(np.array(feature_names)[idx_train])
 ax1.set_xlabel("Importance")
 ax1.set_title("Train Set")
 
-idx_test = np.argsort(rf_pi_test.importances_mean)
+# same ordering for the barplots
 ax2.barh(
     range(n_features),
-    rf_pi_test.importances_mean[idx_test],
-    xerr=rf_pi_test.importances_std[idx_test],
+    rf_pi_test.importances_mean[idx_train],
+    xerr=rf_pi_test.importances_std[idx_train],
 )
 ax2.set_yticks(range(n_features))
-ax2.set_yticklabels(np.array(feature_names)[idx_test])
+ax2.set_yticklabels(np.array(feature_names)[idx_train])
 ax2.set_xlabel("Importance")
 ax2.set_title("Test Set")
 
@@ -196,6 +198,8 @@ plt.show()
 # features to improve the quality of our model. Recursive Feature Elimination with Cross
 # Validation (`RFECV`) provides a good way to trim down irrelevant features.
 # [Justify that permutation importance is sensible by citing Reyero Lobo et al. ?]
+# [Yes ! Maybe explain that j irrelevant means X_j \perp Y | X_{-j}, and that PFI
+# (in the optimal setting) is able to detect such irrelevant features]
 
 from sklearn.feature_selection import RFECV
 
@@ -298,6 +302,7 @@ print(
 )
 
 # %% [markdown]
+# [I feel the summary/recap is a bit dry, maybe give more details?]
 # We showed here that we should be careful with feature importance: it can lead to misleading
 # conclusions when the model is not optimal. We also showed how to use feature importance to
 # perform feature selection and how that can lead to a better model.
